@@ -1,6 +1,6 @@
 import React from "react";
 import "./App.css";
-import { Col, Divider, Input, Layout, Row, Table, Switch } from "antd";
+import { Button, Col, Divider, Input, Layout, Row, Table, Switch } from "antd";
 import "antd/dist/antd.css";
 import { docCookies } from "./cookie.js";
 
@@ -24,7 +24,12 @@ const withPayTableHeaders = [
   { title: "paid", dataIndex: "paid", key: "paid" }
 ];
 
-const buildForm = function (invoiceId, orderTime2) {
+const payStatusMap = new Map([
+  [-1, "医院未支付"],
+  [9, "中心已支付"]
+]);
+
+const buildForm = function(invoiceId, orderTime2) {
   var form =
     "_search=false&nd=" +
     new Date().getTime() +
@@ -35,7 +40,7 @@ const buildForm = function (invoiceId, orderTime2) {
   return form;
 };
 
-const buildPayForm = function (invoiceId, orderTime2, rows) {
+const buildPayForm = function(invoiceId, orderTime2, rows) {
   var form =
     "_search=false&nd=" +
     new Date().getTime() +
@@ -83,8 +88,7 @@ export default class App extends React.Component {
 
   handleTextAreaChange(event) {
     this.setState({
-      textValue: event.target.value,
-      data: []
+      textValue: event.target.value
     });
   }
 
@@ -106,38 +110,44 @@ export default class App extends React.Component {
   }
 
   getSuppurDistributeRecent() {
+    if (this.state.cookie !== "") {
+      this.setCookie();
+    }
+    this.updateData();
     const invoiceIds = this.state.textValue.split("\n");
     invoiceIds.forEach(invoiceId => {
       invoiceId = invoiceId.trim();
-      if (invoiceId !== "") {
-        orderTime2List.forEach(orderTime2 => {
-          fetch(getSuppurDistributeRecentLink, {
-            method: "POST",
-            headers: {
-              "content-type": "application/x-www-form-urlencoded"
-            },
-            body: buildForm(invoiceId, orderTime2)
-          })
-            .then(response => response.json())
-            .then(
-              result => {
-                if (result.rows.length !== 0) {
-                  var sum = 0;
-                  result.rows.forEach(row => {
-                    sum += row.purchaseCount * row.purchasePrice;
-                  });
-                  this.updateDataPriceMap(invoiceId, sum);
-                }
-                this.getPayData(invoiceId, orderTime2, result.rows.length);
-              },
-              error => {
-                this.setState({
-                  error
-                });
-              }
-            );
-        });
+      if (invoiceId === "" || this.state.invoicePriceMap.has(invoiceId)) {
+        return;
       }
+
+      orderTime2List.forEach(orderTime2 => {
+        fetch(getSuppurDistributeRecentLink, {
+          method: "POST",
+          headers: {
+            "content-type": "application/x-www-form-urlencoded"
+          },
+          body: buildForm(invoiceId, orderTime2)
+        })
+          .then(response => response.json())
+          .then(
+            result => {
+              if (result.rows.length !== 0) {
+                var sum = 0;
+                result.rows.forEach(row => {
+                  sum += row.purchaseCount * row.purchasePrice;
+                });
+                this.updateDataPriceMap(invoiceId, sum);
+              }
+              this.getPayData(invoiceId, orderTime2, result.rows.length);
+            },
+            error => {
+              this.setState({
+                error
+              });
+            }
+          );
+      });
     });
   }
 
@@ -147,19 +157,13 @@ export default class App extends React.Component {
       headers: {
         "content-type": "application/x-www-form-urlencoded"
       },
-      body: buildPayForm(invoiceId, orderTime2, rows)
+      body: buildPayForm(invoiceId, orderTime2, 1)
     })
       .then(response => response.json())
       .then(
         result => {
           if (result.rows.length !== 0) {
-            var sum = 0;
-            result.rows.forEach(row => {
-              if (row.payStatus === 9) {
-                sum += row.realAmount;
-              }
-            });
-            this.updateDataPaidMap(invoiceId, sum);
+            this.updateDataPaidMap(invoiceId, result.rows[0].payStatus);
           }
         },
         error => {
@@ -171,10 +175,6 @@ export default class App extends React.Component {
   }
 
   updateDataPriceMap(invoiceId, price) {
-    if (this.state.invoicePriceMap.has(invoiceId)) {
-      return;
-    }
-
     this.setState(state => {
       var cloneInvoicePriceMap = new Map(state.invoicePriceMap);
       cloneInvoicePriceMap.set(invoiceId, price);
@@ -202,13 +202,19 @@ export default class App extends React.Component {
   updateData() {
     this.setState(state => {
       var data = [];
-      state.invoicePriceMap.forEach((key, value) => {
+      const invoiceIds = this.state.textValue.split("\n");
+      invoiceIds.forEach(invoiceId => {
+        invoiceId = invoiceId.trim();
+        if (invoiceId === "") {
+          return;
+        }
         data.push({
-          invoiceId: key,
-          price: value,
-          paid: state.invoicePaidMap.get(key)
+          invoiceId: invoiceId,
+          price: state.invoicePriceMap.get(invoiceId),
+          paid: payStatusMap.get(state.invoicePaidMap.get(invoiceId))
         });
       });
+      console.log(data);
       return {
         data: data
       };
@@ -237,13 +243,21 @@ export default class App extends React.Component {
                 />
               </Col>
             </Row>
-            <TextArea
-              placeholder="请输入发票号"
-              rows={4}
-              allowClear={true}
-              onPressEnter={this.getSuppurDistributeRecent}
-              onChange={this.handleTextAreaChange}
-            />
+            <Row>
+              <Col span={20}>
+                <TextArea
+                  placeholder="请输入发票号"
+                  rows={4}
+                  allowClear={true}
+                  onChange={this.handleTextAreaChange}
+                />
+              </Col>
+              <Col span={4}>
+                <Button type="primary" onClick={this.getSuppurDistributeRecent}>
+                  查询
+                </Button>
+              </Col>
+            </Row>
             <Divider />
             <Table
               columns={this.state.columns}
