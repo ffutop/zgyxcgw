@@ -57,7 +57,7 @@ export default class App extends React.Component {
       textValue: "",
       withPay: false,
       columns: defaultTableHeaders,
-      data: [{ invoiceId: "1111", price: 2020.33 }]
+      data: []
     };
 
     this.handleInputChange = this.handleInputChange.bind(this);
@@ -162,7 +162,6 @@ export default class App extends React.Component {
             var sum = 0;
             result.rows.forEach(row => {
               if (row.payStatus === 9) {
-                console.log(row.realAmount);
                 sum += row.realAmount;
               }
             });
