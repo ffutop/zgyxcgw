@@ -24,7 +24,7 @@ const withPayTableHeaders = [
   { title: "paid", dataIndex: "paid", key: "paid" }
 ];
 
-const buildForm = function(invoiceId, orderTime2) {
+const buildForm = function (invoiceId, orderTime2) {
   var form =
     "_search=false&nd=" +
     new Date().getTime() +
@@ -35,7 +35,7 @@ const buildForm = function(invoiceId, orderTime2) {
   return form;
 };
 
-const buildPayForm = function(invoiceId, orderTime2, rows) {
+const buildPayForm = function (invoiceId, orderTime2, rows) {
   var form =
     "_search=false&nd=" +
     new Date().getTime() +
@@ -57,7 +57,9 @@ export default class App extends React.Component {
       textValue: "",
       withPay: false,
       columns: defaultTableHeaders,
-      data: []
+      data: [],
+      invoicePriceMap: new Map(),
+      invoicePaidMap: new Map()
     };
 
     this.handleInputChange = this.handleInputChange.bind(this);
@@ -66,6 +68,9 @@ export default class App extends React.Component {
     this.getSuppurDistributeRecent = this.getSuppurDistributeRecent.bind(this);
     this.getPayData = this.getPayData.bind(this);
     this.setCookie = this.setCookie.bind(this);
+    this.updateDataPriceMap = this.updateDataPriceMap.bind(this);
+    this.updateDataPaidMap = this.updateDataPaidMap.bind(this);
+    this.updateData = this.updateData.bind(this);
   }
 
   setCookie() {
@@ -121,15 +126,7 @@ export default class App extends React.Component {
                   result.rows.forEach(row => {
                     sum += row.purchaseCount * row.purchasePrice;
                   });
-                  this.setState(state => {
-                    var newData = state.data.concat({
-                      invoiceId: invoiceId,
-                      price: sum
-                    });
-                    return {
-                      data: newData
-                    };
-                  });
+                  this.updateDataPriceMap(invoiceId, sum);
                 }
                 this.getPayData(invoiceId, orderTime2, result.rows.length);
               },
@@ -145,9 +142,6 @@ export default class App extends React.Component {
   }
 
   getPayData(invoiceId, orderTime2, rows) {
-    if (this.state.withPay === false) {
-      return;
-    }
     fetch(getPayDataLink, {
       method: "POST",
       headers: {
@@ -165,17 +159,7 @@ export default class App extends React.Component {
                 sum += row.realAmount;
               }
             });
-            this.setState((state, props) => {
-              var newData = [...state.data];
-              newData.forEach(item => {
-                if (item.invoiceId === invoiceId) {
-                  item.paid = sum;
-                }
-              });
-              return {
-                data: newData
-              };
-            });
+            this.updateDataPaidMap(invoiceId, sum);
           }
         },
         error => {
@@ -184,6 +168,51 @@ export default class App extends React.Component {
           });
         }
       );
+  }
+
+  updateDataPrice(invoiceId, price) {
+    if (this.state.invoicePriceMap.has(invoiceId)) {
+      return;
+    }
+
+    this.setState(state => {
+      var cloneInvoicePriceMap = new Map(state.invoicePriceMap);
+      cloneInvoicePriceMap.set(invoiceId, price);
+      return {
+        invoicePriceMap: cloneInvoicePriceMap
+      };
+    });
+    this.updateData();
+  }
+
+  updateDataPaid(invoiceId, paid) {
+    if (this.state.invoicePaidMap.has(invoiceId)) {
+      return;
+    }
+    this.setState(state => {
+      var cloneInvoicePaidMap = new Map(state.invoicePaidMap);
+      cloneInvoicePaidMap.set(invoiceId, paid);
+      return {
+        invoicePaidMap: cloneInvoicePaidMap
+      };
+    });
+    this.updateData();
+  }
+
+  updateData() {
+    this.setState(state => {
+      var data = [];
+      state.invoicePriceMap.forEach((key, value) => {
+        data.push({
+          invoiceId: key,
+          price: value,
+          paid: state.invoicePaidMap.get(key)
+        });
+      });
+      return {
+        data: data
+      };
+    });
   }
 
   render() {
