@@ -170,7 +170,7 @@ export default class App extends React.Component {
       );
   }
 
-  updateDataPrice(invoiceId, price) {
+  updateDataPriceMap(invoiceId, price) {
     if (this.state.invoicePriceMap.has(invoiceId)) {
       return;
     }
@@ -185,7 +185,7 @@ export default class App extends React.Component {
     this.updateData();
   }
 
-  updateDataPaid(invoiceId, paid) {
+  updateDataPaidMap(invoiceId, paid) {
     if (this.state.invoicePaidMap.has(invoiceId)) {
       return;
     }
