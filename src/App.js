@@ -57,8 +57,9 @@ const buildPayForm = function(invoiceId, orderTime2, rows) {
 export default class App extends React.Component {
   constructor(props) {
     super(props);
+    this.hcloginToken = docCookies.getItem("hcloginToken")
     this.state = {
-      cookie: "",
+      cookie: docCookies.getItem("hcloginToken"),
       textValue: "",
       withPay: false,
       columns: defaultTableHeaders,
@@ -230,7 +231,7 @@ export default class App extends React.Component {
             <Row>
               <Col span={20}>
                 <Input
-                  placeholder="请输入账号登录后的 Cookie"
+                  placeholder={this.state.cookie === "" ? "请输入账号登录后的 Cookie" : "已自动检测到 Cookie，如需更新请输入后按回车"}
                   onChange={this.handleInputChange}
                   onPressEnter={this.setCookie}
                 />
